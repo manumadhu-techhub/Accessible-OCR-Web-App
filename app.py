@@ -6,8 +6,19 @@ import pytesseract
 from pdf2image import convert_from_path
 from docx import Document
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-POPPLER_PATH = r"C:\Users\MANU M M\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
+import platform
+
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    POPPLER_PATH = (
+        r"C:\Users\MANU M M\AppData\Local\Microsoft\WinGet\Packages"
+        r"\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe"
+        r"\poppler-25.07.0\Library\bin"
+    )
+else:
+    # Linux (Docker / Render)
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+    POPPLER_PATH = "/usr/bin"
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 UPLOAD_FOLDER = "uploads"
@@ -178,4 +189,4 @@ def download_docx():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
