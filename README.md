@@ -1,3 +1,12 @@
+---
+title: AccessibleOCR
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
 # Accessible OCR Web App v1.0
 
 An accessible Optical Character Recognition (OCR) web application built with **Python**, **Flask**, and **Tesseract OCR**.
