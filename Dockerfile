@@ -37,4 +37,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 7860
 
 # Start the application
-CMD ["gunicorn", "--bind", "0.0.0.0:7860", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "debug", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:7860", "--timeout", "300", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "app:app"]
