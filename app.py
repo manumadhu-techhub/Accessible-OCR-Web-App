@@ -154,10 +154,16 @@ def upload():
             status = f"OCR completed successfully. {len(pages)} page(s) processed."
         else:
             status = "OCR completed successfully. Image processed."
-
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+
+    
+
+
         status = f"OCR failed: {e}"
-        text = ""
+        text = f"{type(e).__name__}: {e}"
 
     return render_template(
         "index.html",
