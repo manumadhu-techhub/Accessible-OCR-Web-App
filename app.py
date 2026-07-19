@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, Response, stream_with_context
+import json
 import os
 import io
 from PIL import Image
@@ -193,6 +194,112 @@ def download_docx():
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
+
+
+
+def generate_ocr_stream(path, ext, page_selection, ocr_lang):
+    if ext == ".pdf":
+        pages = convert_from_path(path, poppler_path=POPPLER_PATH)
+        total = len(pages)
+
+        if page_selection is not None:
+            if max(page_selection) > total or min(page_selection) < 1:
+                yield json.dumps({
+                    "type": "error",
+                    "message": f"Invalid page selection. This PDF has {total} pages."
+                }) + "\n"
+                return
+
+        indices = [
+            i for i in range(1, total + 1)
+            if page_selection is None or i in page_selection
+        ]
+
+        yield json.dumps({"type": "start", "total": len(indices)}) + "\n"
+
+        for count, i in enumerate(indices, 1):
+            p = pages[i - 1]
+            try:
+                if ocr_lang:
+                    text = pytesseract.image_to_string(p, lang=ocr_lang)
+                else:
+                    text = pytesseract.image_to_string(p)
+            except Exception as e:
+                yield json.dumps({
+                    "type": "error",
+                    "message": f"Page {i} failed: {e}"
+                }) + "\n"
+                continue
+
+            yield json.dumps({
+                "type": "page",
+                "page": i,
+                "index": count,
+                "total": len(indices),
+                "text": text
+            }) + "\n"
+
+        yield json.dumps({
+            "type": "done",
+            "message": f"OCR completed successfully. {len(indices)} page(s) processed."
+        }) + "\n"
+
+    else:
+        try:
+            img = Image.open(path)
+            text = (
+                pytesseract.image_to_string(img, lang=ocr_lang)
+                if ocr_lang else pytesseract.image_to_string(img)
+            )
+            yield json.dumps({
+                "type": "page", "page": 1, "index": 1, "total": 1, "text": text
+            }) + "\n"
+            yield json.dumps({
+                "type": "done", "message": "OCR completed successfully. Image processed."
+            }) + "\n"
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+
+@app.route("/upload-stream", methods=["POST"])
+def upload_stream():
+    if "file" not in request.files or request.files["file"].filename == "":
+        return Response(
+            json.dumps({"type": "error", "message": "No file selected."}) + "\n",
+            mimetype="application/x-ndjson"
+        )
+
+    lang = request.form.get("language", "auto")
+    other = request.form.get("other_language", "").strip()
+
+    try:
+        page_selection = parse_page_selection(
+            request.form.get("pageSelection", "All")
+        )
+    except ValueError as e:
+        return Response(
+            json.dumps({"type": "error", "message": str(e)}) + "\n",
+            mimetype="application/x-ndjson"
+        )
+
+    if lang == "other":
+        ocr_lang = other or "eng"
+    elif lang == "auto":
+        ocr_lang = None
+    else:
+        ocr_lang = lang
+
+    f = request.files["file"]
+    path = os.path.join(UPLOAD_FOLDER, f.filename)
+    f.save(path)
+    ext = os.path.splitext(path)[1].lower()
+
+    return Response(
+        stream_with_context(
+            generate_ocr_stream(path, ext, page_selection, ocr_lang)
+        ),
+        mimetype="application/x-ndjson"
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7860, debug=True)
