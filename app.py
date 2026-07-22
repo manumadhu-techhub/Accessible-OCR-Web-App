@@ -4,7 +4,7 @@ import os
 import io
 from PIL import Image
 import pytesseract
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path, pdfinfo_from_path
 from docx import Document
 
 import platform
@@ -23,6 +23,7 @@ else:
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 UPLOAD_FOLDER = "uploads"
+MAX_PAGES_PER_REQUEST = 20
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -109,7 +110,7 @@ def upload():
     try:
         if ext == ".pdf":
             pages = convert_from_path(path, poppler_path=POPPLER_PATH)
-            out = []                        
+            out = []
             if page_selection is not None:
                 total_pages = len(pages)
 
@@ -117,7 +118,6 @@ def upload():
                     raise ValueError(
                         f"Invalid page selection. This PDF has {total_pages} pages."
                     )
-
 
             for i, p in enumerate(pages, 1):
                 if page_selection is not None and i not in page_selection:
@@ -157,11 +157,7 @@ def upload():
             status = "OCR completed successfully. Image processed."
     except Exception as e:
         import traceback
-
         traceback.print_exc()
-
-    
-
 
         status = f"OCR failed: {e}"
         text = f"{type(e).__name__}: {e}"
@@ -195,12 +191,10 @@ def download_docx():
     )
 
 
-
-
 def generate_ocr_stream(path, ext, page_selection, ocr_lang):
     if ext == ".pdf":
-        pages = convert_from_path(path, poppler_path=POPPLER_PATH)
-        total = len(pages)
+        info = pdfinfo_from_path(path, poppler_path=POPPLER_PATH)
+        total = info["Pages"]
 
         if page_selection is not None:
             if max(page_selection) > total or min(page_selection) < 1:
@@ -209,17 +203,27 @@ def generate_ocr_stream(path, ext, page_selection, ocr_lang):
                     "message": f"Invalid page selection. This PDF has {total} pages."
                 }) + "\n"
                 return
+            indices_all = sorted(page_selection)
+        else:
+            indices_all = list(range(1, total + 1))
 
-        indices = [
-            i for i in range(1, total + 1)
-            if page_selection is None or i in page_selection
-        ]
+        if len(indices_all) > MAX_PAGES_PER_REQUEST:
+            batch = indices_all[:MAX_PAGES_PER_REQUEST]
+            remaining = indices_all[MAX_PAGES_PER_REQUEST:]
+        else:
+            batch = indices_all
+            remaining = []
 
-        yield json.dumps({"type": "start", "total": len(indices)}) + "\n"
+        yield json.dumps({"type": "start", "total": len(batch)}) + "\n"
 
-        for count, i in enumerate(indices, 1):
-            p = pages[i - 1]
+        for count, i in enumerate(batch, 1):
             try:
+                page_images = convert_from_path(
+                    path, poppler_path=POPPLER_PATH,
+                    first_page=i, last_page=i
+                )
+                p = page_images[0]
+
                 if ocr_lang:
                     text = pytesseract.image_to_string(p, lang=ocr_lang)
                 else:
@@ -235,14 +239,27 @@ def generate_ocr_stream(path, ext, page_selection, ocr_lang):
                 "type": "page",
                 "page": i,
                 "index": count,
-                "total": len(indices),
+                "total": len(batch),
                 "text": text
             }) + "\n"
 
-        yield json.dumps({
-            "type": "done",
-            "message": f"OCR completed successfully. {len(indices)} page(s) processed."
-        }) + "\n"
+        if remaining:
+            next_range = f"{remaining[0]}-{remaining[-1]}"
+            yield json.dumps({
+                "type": "done",
+                "message": (
+                    f"Processed pages {batch[0]}-{batch[-1]} of {total}. "
+                    f"{len(remaining)} page(s) remaining."
+                ),
+                "more": True,
+                "next_range": next_range
+            }) + "\n"
+        else:
+            yield json.dumps({
+                "type": "done",
+                "message": f"OCR completed successfully. {len(batch)} page(s) processed.",
+                "more": False
+            }) + "\n"
 
     else:
         try:
@@ -300,6 +317,7 @@ def upload_stream():
         ),
         mimetype="application/x-ndjson"
     )
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7860, debug=True)
