@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, send_file, Response, stream_with_context
 import json
+from google import genai as google_genai
+from google.genai import types as genai_types
 import os
 import io
 from PIL import Image
@@ -191,7 +193,31 @@ def download_docx():
     )
 
 
-def generate_ocr_stream(path, ext, page_selection, ocr_lang):
+def ocr_with_gemini(image, api_key):
+    client = google_genai.Client(api_key=api_key)
+    prompt = (
+        "Transcribe all text visible in this image exactly as it appears. "
+        "Preserve line breaks and reading order. If the text is in multiple "
+        "languages, transcribe each part in its own original language and script. "
+        "Do not translate. Do not add commentary, headings, or explanations, "
+        "only output the transcribed text."
+    )
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[prompt, image]
+    )
+    return response.text
+
+
+def ocr_page(image, ocr_lang, engine, ai_key):
+    if engine == "gemini" and ai_key:
+        return ocr_with_gemini(image, ai_key)
+    if ocr_lang:
+        return pytesseract.image_to_string(image, lang=ocr_lang)
+    return pytesseract.image_to_string(image)
+
+
+def generate_ocr_stream(path, ext, page_selection, ocr_lang, engine, ai_key):
     if ext == ".pdf":
         info = pdfinfo_from_path(path, poppler_path=POPPLER_PATH)
         total = info["Pages"]
@@ -224,10 +250,7 @@ def generate_ocr_stream(path, ext, page_selection, ocr_lang):
                 )
                 p = page_images[0]
 
-                if ocr_lang:
-                    text = pytesseract.image_to_string(p, lang=ocr_lang)
-                else:
-                    text = pytesseract.image_to_string(p)
+                text = ocr_page(p, ocr_lang, engine, ai_key)
             except Exception as e:
                 yield json.dumps({
                     "type": "error",
@@ -264,10 +287,7 @@ def generate_ocr_stream(path, ext, page_selection, ocr_lang):
     else:
         try:
             img = Image.open(path)
-            text = (
-                pytesseract.image_to_string(img, lang=ocr_lang)
-                if ocr_lang else pytesseract.image_to_string(img)
-            )
+            text = ocr_page(img, ocr_lang, engine, ai_key)
             yield json.dumps({
                 "type": "page", "page": 1, "index": 1, "total": 1, "text": text
             }) + "\n"
@@ -306,6 +326,9 @@ def upload_stream():
     else:
         ocr_lang = lang
 
+    engine = request.form.get("engine", "tesseract")
+    ai_key = request.form.get("ai_key", "").strip()
+
     f = request.files["file"]
     path = os.path.join(UPLOAD_FOLDER, f.filename)
     f.save(path)
@@ -313,7 +336,7 @@ def upload_stream():
 
     return Response(
         stream_with_context(
-            generate_ocr_stream(path, ext, page_selection, ocr_lang)
+            generate_ocr_stream(path, ext, page_selection, ocr_lang, engine, ai_key)
         ),
         mimetype="application/x-ndjson"
     )

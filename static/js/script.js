@@ -106,6 +106,15 @@ async function handleOcrSubmit(event, options = {}) {
     statusEl.textContent = "Starting OCR...";
 
     const formData = new FormData(form);
+    const aiSettings = loadAiSettings();
+    formData.set("engine", aiSettings.engine || "tesseract");
+    if (aiSettings.engine === "gemini") {
+        formData.set("ai_key", aiSettings.geminiKey || "");
+    } else if (aiSettings.engine === "google_vision") {
+        formData.set("ai_key", aiSettings.googleVisionKey || "");
+    } else if (aiSettings.engine === "azure") {
+        formData.set("ai_key", aiSettings.azureKey || "");
+    }
 
     try {
         const response = await fetch("/upload-stream", {
