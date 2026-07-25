@@ -14,6 +14,46 @@
 <h1>Accessible OCR Web App</h1>
 
 <p>Upload an image or scanned PDF to extract text.</p>
+<button id="openAiSettingsBtn" type="button">AI Settings</button>
+
+<dialog id="aiSettingsDialog" aria-labelledby="aiSettingsTitle">
+  <h2 id="aiSettingsTitle">AI Settings</h2>
+
+  <p>
+    <label for="ocrEngineSelect">OCR Engine:</label><br>
+    <select id="ocrEngineSelect">
+      <option value="tesseract">Tesseract (free, built-in, no key needed)</option>
+      <option value="gemini">Google Gemini (AI vision, multi-language)</option>
+      <option value="google_vision">Google Cloud Vision (dedicated OCR)</option>
+      <option value="azure">Azure Document Intelligence</option>
+    </select>
+  </p>
+
+  <div id="geminiKeyGroup" style="display:none">
+    <label for="geminiApiKeyInput">Gemini API Key:</label><br>
+    <input type="password" id="geminiApiKeyInput" autocomplete="off">
+    <p>Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (opens in a new tab).</p>
+  </div>
+
+  <div id="googleVisionKeyGroup" style="display:none">
+    <label for="googleVisionApiKeyInput">Google Cloud Vision API Key:</label><br>
+    <input type="password" id="googleVisionApiKeyInput" autocomplete="off">
+    <p>Enable the Vision API and create a key at <a href="https://console.cloud.google.com/apis/library/vision.googleapis.com" target="_blank" rel="noopener">console.cloud.google.com</a> (opens in a new tab).</p>
+  </div>
+
+  <div id="azureKeyGroup" style="display:none">
+    <label for="azureApiKeyInput">Azure Document Intelligence Key:</label><br>
+    <input type="password" id="azureApiKeyInput" autocomplete="off">
+    <label for="azureEndpointInput">Azure Endpoint URL:</label><br>
+    <input type="text" id="azureEndpointInput" autocomplete="off" placeholder="https://your-resource.cognitiveservices.azure.com/">
+    <p>Create a Document Intelligence resource at <a href="https://portal.azure.com" target="_blank" rel="noopener">portal.azure.com</a>, then copy the Key and Endpoint from "Keys and Endpoint" (opens in a new tab).</p>
+  </div>
+
+  <p>
+    <button id="saveAiSettingsBtn" type="button">Save</button>
+    <button id="closeAiSettingsBtn" type="button">Close</button>
+  </p>
+</dialog>
 
 <form action="/upload" method="POST" enctype="multipart/form-data" onsubmit="return handleOcrSubmit(event);">
 

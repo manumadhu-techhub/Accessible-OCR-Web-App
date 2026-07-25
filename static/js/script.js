@@ -1,3 +1,77 @@
+const AI_SETTINGS_KEY = "accessibleOcrAiSettings";
+
+function loadAiSettings() {
+    try {
+        const raw = localStorage.getItem(AI_SETTINGS_KEY);
+        if (!raw) return { engine: "tesseract" };
+        return JSON.parse(raw);
+    } catch (e) {
+        return { engine: "tesseract" };
+    }
+}
+
+function saveAiSettings(settings) {
+    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function updateKeyFieldVisibility(engine) {
+    document.getElementById("geminiKeyGroup").style.display = (engine === "gemini") ? "block" : "none";
+    document.getElementById("googleVisionKeyGroup").style.display = (engine === "google_vision") ? "block" : "none";
+    document.getElementById("azureKeyGroup").style.display = (engine === "azure") ? "block" : "none";
+}
+
+function populateAiSettingsForm() {
+    const settings = loadAiSettings();
+
+    const engineSelect = document.getElementById("ocrEngineSelect");
+    engineSelect.value = settings.engine || "tesseract";
+    updateKeyFieldVisibility(engineSelect.value);
+
+    document.getElementById("geminiApiKeyInput").value = settings.geminiKey || "";
+    document.getElementById("googleVisionApiKeyInput").value = settings.googleVisionKey || "";
+    document.getElementById("azureApiKeyInput").value = settings.azureKey || "";
+    document.getElementById("azureEndpointInput").value = settings.azureEndpoint || "";
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const dialog = document.getElementById("aiSettingsDialog");
+    const openBtn = document.getElementById("openAiSettingsBtn");
+    const closeBtn = document.getElementById("closeAiSettingsBtn");
+    const saveBtn = document.getElementById("saveAiSettingsBtn");
+    const engineSelect = document.getElementById("ocrEngineSelect");
+
+    if (!dialog || !openBtn) return;
+
+    openBtn.addEventListener("click", function () {
+        populateAiSettingsForm();
+        dialog.showModal();
+    });
+
+    closeBtn.addEventListener("click", function () {
+        dialog.close();
+    });
+
+    engineSelect.addEventListener("change", function () {
+        updateKeyFieldVisibility(engineSelect.value);
+    });
+
+    saveBtn.addEventListener("click", function () {
+        const settings = {
+            engine: engineSelect.value,
+            geminiKey: document.getElementById("geminiApiKeyInput").value.trim(),
+            googleVisionKey: document.getElementById("googleVisionApiKeyInput").value.trim(),
+            azureKey: document.getElementById("azureApiKeyInput").value.trim(),
+            azureEndpoint: document.getElementById("azureEndpointInput").value.trim()
+        };
+        saveAiSettings(settings);
+        dialog.close();
+        const statusEl = document.getElementById("statusMsg");
+        if (statusEl) {
+            statusEl.textContent = "AI settings saved. Using: " + settings.engine + ".";
+        }
+    });
+});
+
 async function handleOcrSubmit(event, options = {}) {
     if (event) event.preventDefault();
 
