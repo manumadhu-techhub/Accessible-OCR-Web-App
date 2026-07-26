@@ -196,11 +196,17 @@ def download_docx():
 def ocr_with_gemini(image, api_key):
     client = google_genai.Client(api_key=api_key)
     prompt = (
-        "Transcribe all text visible in this image exactly as it appears. "
-        "Preserve line breaks and reading order. If the text is in multiple "
-        "languages, transcribe each part in its own original language and script. "
-        "Do not translate. Do not add commentary, headings, or explanations, "
-        "only output the transcribed text."
+        "You are a precise OCR transcription engine, not a summarizer, editor, or translator. "
+        "Transcribe every visible word, number, date, price, quantity, and reference code "
+        "exactly as printed, character by character. Pay special attention to numeric details: "
+        "amounts of money, model numbers, specifications (like RAM, storage, screen size), "
+        "dates, and deadlines, these must be transcribed with complete accuracy, not approximated. "
+        "Include headers, footers, tables, stamps, and signature blocks. "
+        "Preserve the original line breaks, spacing, and reading order exactly as they appear. "
+        "If a word or number is unclear or partially visible, transcribe your best precise reading "
+        "rather than skipping or guessing a rounded or plausible-sounding value. "
+        "Keep every language in its own original script; do not translate or transliterate. "
+        "Output only the transcribed text, with no summary, commentary, or added headings."
     )
     response = client.models.generate_content(
         model="gemini-2.5-flash",
